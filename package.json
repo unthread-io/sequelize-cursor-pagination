@@ -3,14 +3,14 @@
     "check": "tsc",
     "build": "rm -rf build && tsc --project tsconfig.build.json"
   },
-  "name": "sequelize-keyset-pagination",
-  "description": "Keyset (aka cursor) pagination for Sequelize",
-  "version": "0.0.3",
+  "name": "@unthread-io/sequelize-cursor-pagination",
+  "description": "Cursor pagination for Sequelize",
+  "version": "0.0.2",
   "license": "MIT",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jakemccloskey/sequelize-keyset-pagination.git"
+    "url": "git+https://github.com/unthread-io/sequelize-cursor-pagination.git"
   },
   "keywords": [
     "sequelize",
@@ -20,7 +20,7 @@
   ],
   "author": "Jake McCloskey",
   "bugs": {
-    "url": "https://github.com/jakemccloskey/sequelize-keyset-pagination/issues"
+    "url": "https://github.com/unthread-io/sequelize-cursor-pagination/issues"
   },
   "peerDependencies": {
     "sequelize": ">= 6.0.0 < 7.0.0"

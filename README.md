@@ -1,15 +1,15 @@
-# sequelize-keyset-pagination
+# sequelize-cursor-pagination
 
-[![npm](https://img.shields.io/npm/v/sequelize-keyset-pagination)](https://www.npmjs.com/package/sequelize-keyset-pagination)
+[![npm](https://img.shields.io/npm/v/@unthread-io/sequelize-cursor-pagination)](https://www.npmjs.com/package/@unthread-io/sequelize-cursor-pagination)
 
-Keyset (aka cursor) pagination for Sequelize.
+Cursor (aka keyset) pagination for Sequelize.
 
 ## Install
 
 With npm:
 
 ```bash
-npm install sequelize-keyset-pagination
+npm install sequelize-cursor-pagination
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ npm install sequelize-keyset-pagination
 This package is written in Typescript.
 
 ```typescript
-import { paginate } from "sequelize-keyset-pagination";
+import { paginate } from "sequelize-cursor-pagination";
 
 const Task = sequelize.define("task", {
   id: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
@@ -63,7 +63,7 @@ guidelines:
 
 Note also that this library will allow you to order on columns of included
 models as well as on functions (by referencing the alias in the `order`). In
-order to get the full benefits of keyset pagination, you should create indexes
+order to get the full benefits of cursor pagination, you should create indexes
 on any columns or combination of columns you plan or ordering on.
 
 ## Limitations
