@@ -35,15 +35,37 @@ export function normalizeOrderKey(orderKey: OrderItemColumn): string {
   return orderKey.name;
 }
 
+function resolveFieldName<
+  M extends Model<TModelAttributes, TCreationAttributes>,
+  TModelAttributes extends Record<string, any> = any,
+  TCreationAttributes extends Record<string, any> = TModelAttributes
+>(model: ModelStatic<M>, orderKeyParts: string[], fieldName: string) {
+  let currentModel: ModelStatic<any> = model;
+
+  for (const part of orderKeyParts) {
+    currentModel = currentModel.associations[part].target;
+  }
+
+  if (orderKeyParts.length === 0) {
+    orderKeyParts.push(model.name);
+  }
+
+  orderKeyParts.push(currentModel.getAttributes()[fieldName].field ?? fieldName);
+
+  return orderKeyParts.join('.');
+}
+
 export function getColumnReference<
   M extends Model<TModelAttributes, TCreationAttributes>,
   TModelAttributes extends Record<string, any> = any,
   TCreationAttributes extends Record<string, any> = TModelAttributes
 >(model: ModelStatic<M>, aliasMap: AliasMap, orderKey: string) {
-  const isTopLevelField = orderKey.split('.').length === 1;
+  const orderKeyParts = orderKey.split('.');
+  const fieldName = orderKeyParts.pop() ?? '';
+  const isTopLevelField = orderKeyParts.length === 0;
   const aliasKey = isTopLevelField ? aliasMap[orderKey] : undefined;
   const isAlias = aliasKey !== undefined;
   const whereKey = aliasKey ?? orderKey;
 
-  return typeof whereKey !== 'string' ? whereKey : Sequelize.col(isTopLevelField && !isAlias ? `${model.name}.${orderKey}` : orderKey);
+  return typeof whereKey !== 'string' ? whereKey : Sequelize.col(!isAlias ? resolveFieldName(model, orderKeyParts, fieldName) : orderKey);
 };

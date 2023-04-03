@@ -5,7 +5,7 @@
   },
   "name": "sequelize-keyset-pagination",
   "description": "Keyset (aka cursor) pagination for Sequelize",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "main": "index.js",
   "repository": {

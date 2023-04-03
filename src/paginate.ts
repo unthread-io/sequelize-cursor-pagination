@@ -107,11 +107,15 @@ export async function paginate<
     rows.pop();
   }
 
+  if (!isNext) {
+    rows.reverse();
+  }
+
   const firstItem = rows[0];
   const lastItem = rows[rows.length - 1];
 
   return [
-    isNext ? rows : rows.reverse(),
+    rows,
     {
       next: lastItem ? [true, fullOrder.map(([orderKey]) => deepGet(lastItem.get({ plain: true }), orderKey.split('.'), null))] : undefined,
       previous: firstItem ? [false, fullOrder.map(([orderKey]) => deepGet(firstItem.get({ plain: true }), orderKey.split('.'), null))] : undefined,
