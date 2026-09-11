@@ -77,3 +77,25 @@ on any columns or combination of columns you plan or ordering on.
   `order: [fn('upper', col('id')), 'ASC']` will not. In order to achieve the
   second example, add `fn('upper', col('id'))` as an attribute with an alias and
   order on the alias.
+
+## PostgreSQL cursor optimization
+
+For two or more non-null model columns ordered in the same direction, pagination
+uses a row comparison such as `(created_at, id) < (cursor_date, cursor_id)`. This
+allows PostgreSQL to seek into a matching composite index on deep pages. Nullable
+columns, mixed directions, joined columns, and expression aliases use the general
+cursor predicate. The optimization changes only page filters; requested totals
+still cover the original query.
+
+## Tests
+
+Run `npm ci`, then start a dedicated test database:
+
+```sh
+docker run --rm --name cursor-pagination-test -p 127.0.0.1:5573:5432 \
+  -e POSTGRES_PASSWORD=postgres postgres:15-alpine
+```
+
+In another terminal, run `npm test`. To use another dedicated test database, set
+`TEST_DATABASE_URL`. Tests create and remove an isolated schema and verify both
+pagination results and PostgreSQL index use. Run `npm run check` for type checking.
