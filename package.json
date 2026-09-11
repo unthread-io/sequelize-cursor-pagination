@@ -1,11 +1,12 @@
 {
   "scripts": {
     "check": "tsc",
-    "build": "rm -rf build && tsc --project tsconfig.build.json"
+    "build": "rm -rf build && tsc --project tsconfig.build.json",
+    "test": "npm run build && node --test test/*.test.cjs"
   },
   "name": "@unthread-io/sequelize-cursor-pagination",
   "description": "Cursor pagination for Sequelize",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "main": "index.js",
   "repository": {
@@ -26,6 +27,7 @@
     "sequelize": ">= 6.0.0 < 7.0.0"
   },
   "devDependencies": {
+    "pg": "^8.23.0",
     "sequelize": "^6.29.0",
     "typescript": "^4.8.4"
   }

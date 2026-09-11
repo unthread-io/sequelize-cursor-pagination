@@ -6,6 +6,44 @@ import { getDirection, normalizeOrderKey, deepGet, getColumnReference } from './
 
 const DIRECTION_OPTIONS = [DIRECTION_DESC, DIRECTION_ASC, `${DIRECTION_DESC} ${DIRECTION_NULLS_LAST}`, `${DIRECTION_DESC} ${DIRECTION_NULLS_FIRST}`, `${DIRECTION_ASC} ${DIRECTION_NULLS_LAST}`, `${DIRECTION_ASC} ${DIRECTION_NULLS_FIRST}`];
 
+// Row comparisons let PostgreSQL seek directly into a matching composite index.
+// Nullable columns and expressions must keep the general cursor predicate below.
+function getTupleCursorWhere<M extends Model>(
+  model: ModelStatic<M>,
+  order: string[][],
+  values: unknown[],
+  aliasMap: AliasMap,
+) {
+  const sequelize = model.sequelize!;
+  const attributes = model.getAttributes();
+  const direction = order[0]?.[1].split(' ')[0];
+
+  if (
+    sequelize.getDialect() !== 'postgres' ||
+    order.length < 2 ||
+    values.length !== order.length ||
+    order.some(([column, columnDirection], i) => {
+      const attribute = attributes[column];
+
+      return column.includes('.') || aliasMap[column] !== undefined || !attribute ||
+        (attribute.allowNull !== false && !attribute.primaryKey) ||
+        columnDirection.split(' ')[0] !== direction ||
+        values[i] == null ||
+        (!['string', 'number'].includes(typeof values[i]) && !(values[i] instanceof Date));
+    })
+  ) {
+    return undefined;
+  }
+
+  const queryInterface = sequelize.getQueryInterface();
+  const columns = order.map(([column]) => {
+    return `${queryInterface.quoteIdentifier(model.name)}.${queryInterface.quoteIdentifier(attributes[column].field ?? column)}`;
+  });
+  const operator = direction === DIRECTION_DESC ? '<' : '>';
+
+  return Sequelize.literal(`(${columns.join(', ')}) ${operator} (${values.map(value => sequelize.escape(value as string | number | Date)).join(', ')})`);
+}
+
 export async function paginate<
   M extends Model<TModelAttributes, TCreationAttributes>,
   TModelAttributes extends Record<string, any> = any,
@@ -27,7 +65,7 @@ export async function paginate<
   const fullWhere: WhereOptions<Attributes<M>>[] = [];
   const fullOrder = (order ? Array.isArray(order) ? order : [order] : []).map((orderItem) => {
     const orderArr = Array.isArray(orderItem) ? [...orderItem] : [orderItem];
-    const originalDirection = DIRECTION_OPTIONS.includes(String(orderArr[orderArr.length - 1]).toUpperCase()) ? orderArr.pop() as string : DIRECTION_ASC;
+    const originalDirection = DIRECTION_OPTIONS.includes(String(orderArr[orderArr.length - 1]).toUpperCase()) ? (orderArr.pop() as string).toUpperCase() : DIRECTION_ASC;
     const direction = getDirection(originalDirection, isNext);
 
     return [orderArr.map(normalizeOrderKey).join('.'), direction];
@@ -48,21 +86,29 @@ export async function paginate<
       }
     }
 
-    fullWhere.push({
-      [Op.or]: fullOrder.map(([orderKey, direction], i: number) => {
+    const tupleCursorWhere = getTupleCursorWhere(model, fullOrder, cursorData, aliasMap);
+
+    fullWhere.push(tupleCursorWhere ?? {
+      [Op.or]: fullOrder.flatMap(([orderKey, direction], i: number) => {
         const columnReference = getColumnReference(model, aliasMap, orderKey);
         const equals: string[][] = fullOrder.slice(0, i);
         const cursorValue = cursorData[i];
         const notEqualsSection: WhereOptions<Attributes<M>>[] = [];
         const operator = direction.startsWith(DIRECTION_DESC) ? Op.lt : Op.gt;
-        const nullsLast = direction.startsWith(DIRECTION_DESC) || direction.endsWith(DIRECTION_NULLS_LAST);
+        const nullsLast = direction.endsWith(DIRECTION_NULLS_LAST) ||
+          (!direction.endsWith(DIRECTION_NULLS_FIRST) && direction.startsWith(DIRECTION_ASC));
 
-        if (cursorValue == null && nullsLast) {
-          notEqualsSection.push(Sequelize.where(columnReference, Op.not, cursorValue));
-        } else if (cursorValue != null) {
+        if (cursorValue == null) {
+          if (nullsLast) {
+            // Nothing follows NULL at this key; later keys still break ties.
+            return [];
+          }
+
+          notEqualsSection.push(Sequelize.where(columnReference, Op.not, null));
+        } else {
           const notEqualsSectionOr: WhereOptions<Attributes<M>>[] = [Sequelize.where(columnReference, operator, cursorValue)];
 
-          if (!nullsLast && !model.primaryKeyAttributes.includes(orderKey)) {
+          if (nullsLast && (aliasMap[orderKey] !== undefined || !model.primaryKeyAttributes.includes(orderKey))) {
             notEqualsSectionOr.push(Sequelize.where(columnReference, Op.is, null));
           }
 
@@ -71,7 +117,7 @@ export async function paginate<
           });
         }
 
-        return {
+        return [{
           [Op.and]: equals
             .map(([equalsOrderKey], i): WhereOptions<Attributes<M>> => {
               return Sequelize.where(
@@ -81,7 +127,7 @@ export async function paginate<
               );
             })
             .concat(notEqualsSection),
-        };
+        }];
       }),
     });
   }
