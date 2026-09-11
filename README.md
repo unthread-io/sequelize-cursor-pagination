@@ -9,7 +9,7 @@ Cursor (aka keyset) pagination for Sequelize.
 With npm:
 
 ```bash
-npm install sequelize-cursor-pagination
+npm install @unthread-io/sequelize-cursor-pagination
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ npm install sequelize-cursor-pagination
 This package is written in Typescript.
 
 ```typescript
-import { paginate } from "sequelize-cursor-pagination";
+import { paginate } from "@unthread-io/sequelize-cursor-pagination";
 
 const Task = sequelize.define("task", {
   id: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
@@ -27,18 +27,18 @@ const Task = sequelize.define("task", {
 const [rows, cursors, totalCount] = await paginate(Task, {
   limit: 20,
   includeTotalCount: true,
-  order: ["id", "ASC"],
+  order: [["id", "ASC"]],
 });
 
 const [nextRows, nextCursors] = await paginate(Task, {
   limit: 20,
-  order: ["id", "ASC"],
+  order: [["id", "ASC"]],
   cursor: cursors.next,
 });
 
-const [prewiousRows, previousCursors] = await paginate(Task, {
+const [previousRows, previousCursors] = await paginate(Task, {
   limit: 20,
-  order: ["id", "ASC"],
+  order: [["id", "ASC"]],
   cursor: cursors.previous,
 });
 ```
@@ -58,8 +58,16 @@ guidelines:
 - When passing a cursor, you should pass the same `order` property as the
   original query.
 - The columns you are ordering on should be selected as part of the query.
-- You should include the primary key or another unique column as the last column
-  to order by. This library will not do that for you.
+- The complete `order` must uniquely identify each result row. Append a non-null
+  primary key or another non-null unique key to break ties. For a composite key,
+  include every component needed for uniqueness within the filtered result set.
+  This library does not append tiebreakers automatically. For example, use
+  `order: [["score", "ASC"], ["name", "ASC"], ["id", "ASC"]]` when `score`
+  and `name` can repeat or be NULL. Without a unique ordering, rows that share
+  all cursor values cannot be distinguished and may be skipped across pages.
+- Use nested arrays for order items, such as `order: [["id", "ASC"]]`.
+  The flat form `order: ["id", "ASC"]` is currently unsupported at runtime,
+  even though the TypeScript types accept it.
 
 Note also that this library will allow you to order on columns of included
 models as well as on functions (by referencing the alias in the `order`). In
@@ -73,8 +81,8 @@ on any columns or combination of columns you plan or ordering on.
 - Does not support ordering on nested properties that are aliased.
 - Not all types supported in `order` by `findAll` are supported by `paginate`.
   You can only order on strings, column references, or models. For example,
-  `order: [Subtask, 'id', 'ASC']` will work but
-  `order: [fn('upper', col('id')), 'ASC']` will not. In order to achieve the
+  `order: [[Subtask, 'id', 'ASC']]` will work but
+  `order: [[fn('upper', col('id')), 'ASC']]` will not. In order to achieve the
   second example, add `fn('upper', col('id'))` as an attribute with an alias and
   order on the alias.
 
@@ -86,6 +94,15 @@ allows PostgreSQL to seek into a matching composite index on deep pages. Nullabl
 columns, mixed directions, joined columns, and expression aliases use the general
 cursor predicate. The optimization changes only page filters; requested totals
 still cover the original query.
+
+The optimization determines nullability from Sequelize model metadata
+(`allowNull: false` or `primaryKey: true`); it does not introspect database
+constraints. These declarations must match the actual database schema. A model
+marked non-null over a column that can contain NULL may cause rows to be omitted
+by the tuple comparison. When using migrations or defining models over existing
+tables, verify that the non-null declarations are backed by database constraints
+and keep both in sync. Nullable columns must remain declared nullable so they
+use the general cursor predicate.
 
 ## Tests
 
