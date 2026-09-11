@@ -6,7 +6,7 @@
   },
   "name": "@unthread-io/sequelize-cursor-pagination",
   "description": "Cursor pagination for Sequelize",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "main": "index.js",
   "repository": {
